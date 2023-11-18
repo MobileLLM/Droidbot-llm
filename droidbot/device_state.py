@@ -289,6 +289,8 @@ class DeviceState(object):
         import hashlib
         view_str = hashlib.md5(view_str.encode('utf-8')).hexdigest()
         view_dict['view_str'] = view_str
+        bounds = view_dict['bounds']
+        view_dict['bound_box'] = f'{bounds[0][0]},{bounds[0][1]},{bounds[1][0]},{bounds[1][1]}'
         return view_str
 
     def __get_view_structure(self, view_dict):
@@ -479,11 +481,11 @@ class DeviceState(object):
                 'android:id/statusBarBackground']:
                 enabled_view_ids.append(view_dict['temp_id'])
         
-        text_frame = "<p id=@ text='&' attr=null bounds=null>#</p>"
-        btn_frame = "<button id=@ text='&' attr=null bounds=null>#</button>"
-        checkbox_frame = "<checkbox id=@ text='&' attr=null bounds=null>#</checkbox>"
-        input_frame = "<input id=@ text='&' attr=null bounds=null>#</input>"
-        scroll_frame = "<scrollbar id=@ attr=null bounds=null></scrollbar>"
+        text_frame = "<p id=@ alt='&' attr=null bounds=null>#</p>"
+        btn_frame = "<button id=@ alt='&' attr=null bounds=null>#</button>"
+        checkbox_frame = "<checkbox id=@ alt='&' attr=null bounds=null>#</checkbox>"
+        input_frame = "<input id=@ alt='&' attr=null bounds=null>#</input>"
+        scroll_frame = "<scrollbar id=@ alt='&' attr=null bounds=null>#</scrollbar>"
 
         view_descs = []
         indexed_views = []
@@ -506,8 +508,7 @@ class DeviceState(object):
             content_description = self.__safe_dict_get(view, 'content_description', default='')
             view_text = self.__safe_dict_get(view, 'text', default='')
             view_class = self.__safe_dict_get(view, 'class').split('.')[-1]
-            bounds = self.__safe_dict_get(view, 'bounds')
-            view_bounds = f'{bounds[0][0]},{bounds[0][1]},{bounds[1][0]},{bounds[1][1]}'
+            view_bounds = self.__safe_dict_get(view, 'bound_box')
             if not content_description and not view_text and not scrollable:  # actionable?
                 continue
 
@@ -515,20 +516,11 @@ class DeviceState(object):
             # view_status = ''
             view_local_id = str(len(view_descs))
             if editable:
-                view_desc = input_frame.replace('@', view_local_id).replace('#', view_text)
-                if content_description:
-                    view_desc = view_desc.replace('&', content_description)
-                else:
-                    view_desc = view_desc.replace(" text='&'", "")
-                # available_actions.append(SetTextEvent(view=view, text='HelloWorld'))
+                view_desc = input_frame
             elif checkable:
-                view_desc = checkbox_frame.replace('@', view_local_id).replace('#', view_text)
-                if content_description:
-                    view_desc = view_desc.replace('&', content_description)
-                else:
-                    view_desc = view_desc.replace(" text='&'", "")
-                # available_actions.append(TouchEvent(view=view))
+                view_desc = checkbox_frame
             elif clickable:  # or long_clickable
+                view_desc = btn_frame
                 if merge_buttons:
                     # below is to merge buttons, led to bugs
                     clickable_ancestor_id = self._get_ancestor_id(view=view, key='clickable')
@@ -539,29 +531,22 @@ class DeviceState(object):
                         clickable_children_ids.append(view_id)
                     view_text, content_description = self._merge_text(clickable_children_ids)
                     checked = self._get_children_checked(clickable_children_ids)
-                    # end of merging buttons
-                view_desc = btn_frame.replace('@', view_local_id).replace('#', view_text)
-                if content_description:
-                    view_desc = view_desc.replace('&', content_description)
-                else:
-                    view_desc = view_desc.replace(" text='&'", "")
-                # available_actions.append(TouchEvent(view=view))
-                if merge_buttons:
                     for clickable_child in clickable_children_ids:
                         if clickable_child in enabled_view_ids and clickable_child != view_id:
                             removed_view_ids.append(clickable_child)
             elif scrollable:
-                # print(view_id, 'continued')
-                view_desc = scroll_frame.replace('@', view_local_id)
-                # available_actions.append(ScrollEvent(view=view, direction='DOWN'))
-                # available_actions.append(ScrollEvent(view=view, direction='UP'))
+                view_desc = scroll_frame
             else:
-                view_desc = text_frame.replace('@', view_local_id).replace('#', view_text)
-                if content_description:
-                    view_desc = view_desc.replace('&', content_description)
-                else:
-                    view_desc = view_desc.replace(" text='&'", "")
-                # available_actions.append(TouchEvent(view=view))
+                view_desc = text_frame
+
+            short_view_text = view_text.replace('\n', ' \\ ')
+            short_view_text = view_text[:50] if len(view_text) > 50 else view_text
+            view_desc = view_desc.replace('#', short_view_text)
+            if content_description:
+                view_desc = view_desc.replace('&', content_description)
+            else:
+                view_desc = view_desc.replace(" alt='&'", "")
+            view_desc = view_desc.replace('@', view_local_id)
 
             allowed_actions = ['touch']
             special_attrs = []

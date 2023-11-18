@@ -69,7 +69,7 @@ POSSIBLE_BROADCASTS = [
     "android.intent.action.WEB_SEARCH"
 ]
 
-KEY_KeyEvent = "key"
+KEY_KeyEvent = "press"
 KEY_ManualEvent = "manual"
 KEY_ExitEvent = "exit"
 KEY_TouchEvent = "touch"
@@ -443,10 +443,12 @@ class UIEvent(InputEvent):
     @staticmethod
     def view_str(state, view):
         view_class = view['class'].split('.')[-1]
-        view_text = view['text'].replace('\n', '\\n') if 'text' in view and view['text'] else ''
-        view_text = view_text[:10] if len(view_text) > 10 else view_text
-        view_short_sig = f'{state.activity_short_name}/{view_class}-{view_text}'
-        return f"state={state.state_str}, view={view['view_str']}({view_short_sig})"
+        view_text = view['text'].replace('\n', ' \\ ') if 'text' in view and view['text'] else ''
+        view_text = view_text[:50] if len(view_text) > 50 else view_text
+        view_idx = state.views.index(view) if view in state.views else 'N/A'
+        # view_short_sig = f'{state.activity_short_name}/{view_class}-{view_text}'
+        view_short_sig = f'<{view_idx}-{view_class}-{view_text}>'
+        return f"state={state.state_str}, view={view_short_sig}"
 
 
 class TouchEvent(UIEvent):
