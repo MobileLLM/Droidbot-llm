@@ -183,6 +183,10 @@ class UtgBasedInputPolicy(InputPolicy):
         return event
 
     def __update_utg(self):
+        if self.last_event is None or isinstance(self.last_event, KillAppEvent):
+            return
+        if self.current_state.is_popup:    # fix popup window TODO check whether it works correctly
+            self.current_state.parent_state = self.last_state
         self.utg.add_transition(self.last_event, self.last_state, self.current_state)
 
     @abstractmethod

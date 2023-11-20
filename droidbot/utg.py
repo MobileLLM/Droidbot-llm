@@ -271,7 +271,7 @@ class UTG(object):
             steps = []
             from_state_str = from_state.state_str
             to_state_str = to_state.state_str
-            state_strs = nx.shortest_path(G=self.G, source=from_state_str, target=to_state_str)
+            state_strs = nx.shortest_path(self.G, from_state_str, to_state_str)
             if not isinstance(state_strs, list) or len(state_strs) < 2:
                 self.logger.warning(f"Error getting path from {from_state_str} to {to_state_str}")
             start_state_str = state_strs[0]
@@ -310,7 +310,7 @@ class UTG(object):
         to_state_str = to_state.structure_str
         try:
             nav_steps = []
-            state_strs = nx.shortest_path(G=self.G2, source=from_state_str, target=to_state_str)
+            state_strs = nx.shortest_path(self.G2, from_state_str, to_state_str)
             if not isinstance(state_strs, list) or len(state_strs) < 2:
                 return None
             start_state_str = state_strs[0]
@@ -335,6 +335,6 @@ class UTG(object):
                 simple_nav_steps.append((state, action))
             return simple_nav_steps
         except Exception as e:
-            print(e)
+            # print(e)
             return None
 

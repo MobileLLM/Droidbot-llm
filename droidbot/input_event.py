@@ -442,12 +442,16 @@ class UIEvent(InputEvent):
 
     @staticmethod
     def view_str(state, view):
-        view_class = view['class'].split('.')[-1]
-        view_text = view['text'].replace('\n', ' \\ ') if 'text' in view and view['text'] else ''
-        view_text = view_text[:50] if len(view_text) > 50 else view_text
-        view_idx = state.views.index(view) if view in state.views else 'N/A'
-        # view_short_sig = f'{state.activity_short_name}/{view_class}-{view_text}'
-        view_short_sig = f'<{view_idx}-{view_class}-{view_text}>'
+        if 'desc' in view:
+            view_short_sig = view['desc']
+        else:
+            view_class = view['class'].split('.')[-1]
+            view_text = view['text'].replace('\n', ' \\ ') if 'text' in view and view['text'] else ''
+            view_text = view_text[:50] if len(view_text) > 50 else view_text
+            view_bounds = view['bound_box'] if 'bound_box' in view else ''
+            # view_idx = state.views.index(view) if view in state.views else ''
+            # view_short_sig = f'{state.activity_short_name}/{view_class}-{view_text}'
+            view_short_sig = f'<{view_bounds}-{view_class}-{view_text}>'
         return f"state={state.state_str}, view={view_short_sig}"
 
 
@@ -505,10 +509,10 @@ class SelectEvent(UIEvent):
 
     def send(self, device):
         x, y = UIEvent.get_xy(x=self.x, y=self.y, view=self.view)
-        if 'special_attr' in self.view:
-            if self.event_type == KEY_UnselectEvent and 'selected' in self.view['special_attr']:
+        if 'status' in self.view:
+            if self.event_type == KEY_UnselectEvent and 'selected' in self.view['status']:
                 device.view_long_touch(x=x, y=y, duration=200)
-            elif self.event_type == KEY_SelectEvent and 'selected' not in self.view['special_attr']:
+            elif self.event_type == KEY_SelectEvent and 'selected' not in self.view['status']:
                 device.view_long_touch(x=x, y=y, duration=200)
         else:
             device.view_long_touch(x=x, y=y, duration=200)

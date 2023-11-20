@@ -26,17 +26,45 @@ class DeviceState(object):
         self.view_tree = {}
         self.__assemble_view_tree(self.view_tree, self.views)
         self.__generate_view_strs()
-        self.state_str = self.__get_state_str()
-        self.structure_str = self.__get_content_free_state_str()
+        self.state_str_ = self.__get_state_str()
+        self.structure_str_ = self.__get_content_free_state_str()
         self.search_content = self.__get_search_content()
         self.text_representation = self.get_text_representation()
         self.possible_events = None
         self.width = device.get_width(refresh=True)
         self.height = device.get_height(refresh=False)
+        self.is_popup = self.is_popup_window()
+        self.parent_state = None
+
+    @property
+    def state_str(self):
+        if self.is_popup and self.parent_state is not None:
+            return f'{self.parent_state.state_str}/{self.state_str_}'
+        else:
+            return self.state_str_
+        
+    @property
+    def structure_str(self):
+        if self.is_popup and self.parent_state is not None:
+            return f'{self.parent_state.structure_str}/{self.structure_str_}'
+        else:
+            return self.structure_str_
 
     @property
     def activity_short_name(self):
         return self.foreground_activity.split('.')[-1]
+    
+    @property
+    def root_view_bounds(self):
+        return self.views[0]['bounds']
+    
+    def is_popup_window(self):
+        root_view = self.views[0]
+        root_width = DeviceState.get_view_width(root_view)
+        root_height = DeviceState.get_view_height(root_view)
+        if root_width < self.width or root_height < self.height:
+            return True
+        return False
 
     def to_dict(self):
         state = {'tag': self.tag,
@@ -481,11 +509,11 @@ class DeviceState(object):
                 'android:id/statusBarBackground']:
                 enabled_view_ids.append(view_dict['temp_id'])
         
-        text_frame = "<p id=@ alt='&' attr=null bounds=null>#</p>"
-        btn_frame = "<button id=@ alt='&' attr=null bounds=null>#</button>"
-        checkbox_frame = "<checkbox id=@ alt='&' attr=null bounds=null>#</checkbox>"
-        input_frame = "<input id=@ alt='&' attr=null bounds=null>#</input>"
-        scroll_frame = "<scrollbar id=@ alt='&' attr=null bounds=null>#</scrollbar>"
+        text_frame = "<p id=@ alt='&' status=null bounds=null>#</p>"
+        btn_frame = "<button id=@ alt='&' status=null bounds=null>#</button>"
+        checkbox_frame = "<checkbox id=@ alt='&' status=null bounds=null>#</checkbox>"
+        input_frame = "<input id=@ alt='&' status=null bounds=null>#</input>"
+        scroll_frame = "<scrollbar id=@ alt='&' status=null bounds=null>#</scrollbar>"
 
         view_descs = []
         indexed_views = []
@@ -549,7 +577,7 @@ class DeviceState(object):
             view_desc = view_desc.replace('@', view_local_id)
 
             allowed_actions = ['touch']
-            special_attrs = []
+            status = []
             if editable:
                 allowed_actions.append('set_text')
             if checkable:
@@ -561,25 +589,24 @@ class DeviceState(object):
             if long_clickable:
                 allowed_actions.append('long_touch')
             if checked or selected:
-                special_attrs.append('selected')
+                status.append('selected')
             view['allowed_actions'] = allowed_actions
-            view['special_attrs'] = special_attrs
+            view['status'] = status
             view['local_id'] = view_local_id
-            if len(special_attrs) > 0:
-                special_attrs = ','.join(special_attrs)
-                view_desc = view_desc.replace("attr=null", f"attr={special_attrs}")
+            if len(status) > 0:
+                status = ','.join(status)
+                view_desc = view_desc.replace("status=null", f"status={status}")
             else:
-                view_desc = view_desc.replace(" attr=null", "")
+                view_desc = view_desc.replace(" status=null", "")
             view_desc = view_desc.replace("bounds=null", f"bound_box={view_bounds}")
             view_descs.append(view_desc)
-            view['desc'] = view_desc.replace(f' id={view_local_id}', '').replace(f' attr={special_attrs}', '')
+            view['desc'] = view_desc.replace(f' id={view_local_id}', '').replace(f' status={status}', '')
             indexed_views.append(view)
 
         # prefix = 'The current state has the following UI elements: \n' #views and corresponding actions, with action id in parentheses:\n '
         state_desc = '\n'.join(view_descs)
-        activity = self.foreground_activity.split('/')[-1]
         # print(views_without_id)
-        return state_desc, activity, indexed_views
+        return state_desc, indexed_views
 
     def _get_self_ancestors_property(self, view, key, default=None):
         all_views = [view] + [self.views[i] for i in self.get_all_ancestors(view)]
