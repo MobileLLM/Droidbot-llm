@@ -32,7 +32,7 @@ POLICY_REPLAY = "replay"
 POLICY_MANUAL = "manual"
 POLICY_MONKEY = "monkey"
 POLICY_NONE = "none"
-POLICY_MEMORY_GUIDED = "memory_guided"  # implemented in input_policy2
+POLICY_MEMORY_GUIDED = "memory_guided"  # implemented in input_policy3
 POLICY_LLM_GUIDED = "llm_guided"  # implemented in input_policy3
 
 
@@ -185,8 +185,12 @@ class UtgBasedInputPolicy(InputPolicy):
     def __update_utg(self):
         if self.last_event is None or isinstance(self.last_event, KillAppEvent):
             return
-        if self.current_state.is_popup:    # fix popup window TODO check whether it works correctly
-            self.current_state.parent_state = self.last_state
+        if self.current_state.is_popup:    # change the state_str of popup window. TODO check whether it works correctly
+            if self.last_state is not None and self.last_state.parent_state is not None:
+                # last state is also a popup
+                self.current_state.parent_state = self.last_state.parent_state
+            else:
+                self.current_state.parent_state = self.last_state
         self.utg.add_transition(self.last_event, self.last_state, self.current_state)
 
     @abstractmethod

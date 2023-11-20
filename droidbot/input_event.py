@@ -443,7 +443,7 @@ class UIEvent(InputEvent):
     @staticmethod
     def view_str(state, view):
         if 'desc' in view:
-            view_short_sig = view['desc']
+            view_short_sig = view['desc'].replace('<', '[').replace('>', ']')
         else:
             view_class = view['class'].split('.')[-1]
             view_text = view['text'].replace('\n', ' \\ ') if 'text' in view and view['text'] else ''
@@ -451,7 +451,7 @@ class UIEvent(InputEvent):
             view_bounds = view['bound_box'] if 'bound_box' in view else ''
             # view_idx = state.views.index(view) if view in state.views else ''
             # view_short_sig = f'{state.activity_short_name}/{view_class}-{view_text}'
-            view_short_sig = f'<{view_bounds}-{view_class}-{view_text}>'
+            view_short_sig = f'[{view_bounds}-{view_class}-{view_text}]'
         return f"state={state.state_str}, view={view_short_sig}"
 
 

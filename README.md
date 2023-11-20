@@ -2,6 +2,8 @@
 
 ## About
 
+(This is an ongoing work. Repo not ready yet.)
+
 DroidBot-LLM is an LLM-powered test input generator for Android.
 DroidBot-LLM is based on [DroidBot](https://github.com/honey/droidbot). By leveraging LLM, the generated input can be more intelligent.
 
@@ -15,7 +17,7 @@ DroidBot-LLM is based on [DroidBot](https://github.com/honey/droidbot). By lever
 2. `Java`
 3. `Android SDK`
 4. Add `platform_tools` directory in Android SDK to `PATH`
-5. Set `GPT_API_URL` and `GPT_API_URL` environment variables to your ChatGPT API url and key.
+5. Set `GPT_API_URL` and `GPT_API_KEY` environment variables to your ChatGPT API url and key.
 
 ## How to install
 

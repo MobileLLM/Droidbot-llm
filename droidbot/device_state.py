@@ -26,8 +26,8 @@ class DeviceState(object):
         self.view_tree = {}
         self.__assemble_view_tree(self.view_tree, self.views)
         self.__generate_view_strs()
-        self.state_str_ = self.__get_state_str()
-        self.structure_str_ = self.__get_content_free_state_str()
+        self.state_str_ = self.__get_state_str()[:6]
+        self.structure_str_ = self.__get_content_free_state_str()[:6]
         self.search_content = self.__get_search_content()
         self.text_representation = self.get_text_representation()
         self.possible_events = None

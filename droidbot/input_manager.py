@@ -8,11 +8,11 @@ from .input_policy import UtgBasedInputPolicy, UtgNaiveSearchPolicy, UtgGreedySe
                          UtgReplayPolicy, \
                          ManualPolicy, \
                          POLICY_NAIVE_DFS, POLICY_GREEDY_DFS, \
-                         POLICY_NAIVE_BFS, POLICY_GREEDY_BFS, \
+                         POLICY_NAIVE_BFS , POLICY_GREEDY_BFS, \
                          POLICY_REPLAY, POLICY_MEMORY_GUIDED, POLICY_LLM_GUIDED, \
                          POLICY_MANUAL, POLICY_MONKEY, POLICY_NONE
 
-DEFAULT_POLICY = POLICY_GREEDY_DFS
+DEFAULT_POLICY = POLICY_GREEDY_DFS 
 DEFAULT_EVENT_INTERVAL = 1
 DEFAULT_EVENT_COUNT = 100000000
 DEFAULT_TIMEOUT = -1
@@ -73,11 +73,8 @@ class InputManager(object):
         elif self.policy_name in [POLICY_GREEDY_DFS, POLICY_GREEDY_BFS]:
             input_policy = UtgGreedySearchPolicy(device, app, self.random_input, self.policy_name)
         elif self.policy_name == POLICY_MEMORY_GUIDED:
-            from .input_policy2 import MemoryGuidedPolicy
-            input_policy = MemoryGuidedPolicy(device, app, self.random_input)
-        elif self.policy_name == POLICY_LLM_GUIDED:
-            from .input_policy3 import LLM_Guided_Policy
-            input_policy = LLM_Guided_Policy(device, app, self.random_input)
+            from .input_policy3 import Memory_Guided_Policy
+            input_policy = Memory_Guided_Policy(device, app, self.random_input)
         elif self.policy_name == POLICY_REPLAY:
             input_policy = UtgReplayPolicy(device, app, self.replay_output)
         elif self.policy_name == POLICY_MANUAL:
