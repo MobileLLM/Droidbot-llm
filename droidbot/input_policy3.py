@@ -560,7 +560,7 @@ class Memory:
 
 
 class Memory_Guided_Policy(UtgBasedInputPolicy):
-    def __init__(self, device, app, random_input, debug_mode=True):
+    def __init__(self, device, app, random_input, debug_mode=False):
         super(Memory_Guided_Policy, self).__init__(device, app, random_input)
         self.logger = logging.getLogger(self.__class__.__name__)
 
