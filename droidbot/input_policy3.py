@@ -560,7 +560,7 @@ class Memory:
 
 
 class Memory_Guided_Policy(UtgBasedInputPolicy):
-    def __init__(self, device, app, random_input):
+    def __init__(self, device, app, random_input, debug_mode=True):
         super(Memory_Guided_Policy, self).__init__(device, app, random_input)
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -568,6 +568,9 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         self.previous_actions = []
         self._nav_steps = []
         self._num_steps_outside = 0
+        
+        # for manually generating UTG
+        self.debug_mode = debug_mode
 
     def generate_event_based_on_utg(self):
         """
@@ -588,6 +591,12 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
             import traceback
             traceback.print_exc()
         # self.logger.info(f'we have {len(self.memory.known_transitions)} transitions now')
+        
+        if self.debug_mode and self.last_event is not None:
+            executable_action = self.get_manual_action(current_state)
+            self.logger.debug("current state: %s" % current_state.state_str)
+            self._dump_memory()
+            return returned_action(current_state, executable_action)
 
         if self.last_event is not None:
             self.last_event.log_lines = self.parse_log_lines()
@@ -791,11 +800,51 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         if self.action_count % DUMP_MEMORY_NUM_STEPS != 1:
             return
         self.memory.action_history.to_csv(os.path.join(self.device.output_dir, "actions.csv"))
-        # memory_path = os.path.join(self.device.output_dir, "memory.txt")
-        # memory_str = self.memory.to_string()
-        # with open(memory_path, "w") as memory_file:
-        #     memory_file.write(memory_str)
+        memory_path = os.path.join(self.device.output_dir, "memory.txt")
+        memory_str = self.memory.to_string()
+        with open(memory_path, "w") as memory_file:
+            memory_file.write(memory_str)
+            
+    def get_manual_action(self, state):
+        
+        def debug_action_extract(answer):
+            
+            # <element id>, <text>
+            match = re.match(r'(\w+), \'(.*?)\'', answer)
 
+            if match:
+                id_value = int(match.group(1))
+                input_text_value = match.group(2)
+                return id_value, 'input', input_text_value
+            else:
+                return int(answer), 'tap', None
+        
+        element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
+        element_descs_without_bbox = [re.sub(r'\s*bound_box=\d+,\d+,\d+,\d+', '', desc) for desc in element_descs]
+        print('='*50, '\n', '\n'.join(element_descs_without_bbox), '\n', '='*50)
+        response = input(f"<ID>, '<input text>', e.g. 1, 'Alice': ") #if self.debug_mode else tools.query_gpt(prompt)
+        id, action_type, input_text = debug_action_extract(response)
+        selected_action_type, selected_element = actiontypes[id], all_elements[id]
+        return Utils.pack_action(selected_action_type, selected_element, input_text)
+        
+            
+    def parse_all_executable_actions(self, state):
+        state_info = self.memory._memorize_state(state)
+        elements = state_info['elements']
+        
+        element_descs, actiontypes, all_elements = [], [], []  # an element may have different action types, so len(all_elements)>len(elements)
+        # executable_actions = [self.memory.get_executable_action(state, target_element, target_action_type)]
+        action_id = 0
+        for element_id, element in enumerate(elements):
+            for element_action_id, actiontype in enumerate(element['allowed_actions']):
+                element_descs.append(f"element{action_id}: {element['desc']} // {actiontype}")
+                # action = self.memory.get_executable_action(state, element, actiontype)
+                actiontypes.append(actiontype)
+                all_elements.append(element)
+                action_id += 1
+        return element_descs, actiontypes, all_elements
+        
+        
 
 if __name__ == '__main__':
     r = GPT.query('hello!')

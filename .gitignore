@@ -63,3 +63,6 @@ Gemfile.lock
 documents
 temp
 venv
+
+apks
+output

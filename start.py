@@ -6,7 +6,9 @@ from droidbot import input_policy
 from droidbot import env_manager
 from droidbot import DroidBot
 from droidbot.droidmaster import DroidMaster
-
+import os
+os.environ['GPT_API_URL'] = "https://api.nextweb.fun/openai/v1/chat/completions"
+os.environ['GPT_API_KEY'] = "ak-nX1zF48PdkdPuJjoNgk8Chbf2AW3mWxZYszDyll3wYu6l2d0"
 
 def parse_args():
     """
