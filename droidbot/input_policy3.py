@@ -166,6 +166,7 @@ class Memory:
         state_desc = f' page {list(semantic_states.keys()).index(semantic_state_title)}: {semantic_state_title}\n'
         semantic_elements = semantic_states[semantic_state_title]['semantic_elements']
         same_function_element_groups = []
+        print(semantic_elements)
         for ei, semantic_element_title in enumerate(semantic_elements.keys()):
             action_targets = semantic_elements[semantic_element_title]['action_targets']
             action_effect_info = []
@@ -185,7 +186,12 @@ class Memory:
                         action_effects.append(f'go to page {str(target_semantic_state_id)}')
                     if not action_effects:
                         continue
-                    action_effect_info.append(f'on {action_type}, {", ".join(action_effects)}')
+                    
+                    if Manual_mode:
+                        action_effect_info.append(f'on {action_type}, {", ".join(action_effects)}')
+                    else:
+                        action_effect_info.append(f'on {action_type}, {", ".join(action_effects)}')
+                    
             if with_similarity_info:
                 similar_semantic_elements = semantic_elements[semantic_element_title]['similar_semantic_elements']
                 similar_ele_ids = []
@@ -833,32 +839,44 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
     def get_manual_action(self, state):
         
         def debug_action_extract(actions):
+            ele_set, action_set, input_set = False, False, False
             element_id, action_choice, input_text_value = None, None, None
-            for _ in range(3):
+            while not ele_set:
                 try:
                     response = input(f"Please input element id:")
                     element_id = int(response)
+                    ele_set = True
                     break
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt()
                 except:
+                    print('warning, wrong format, please input again')
                     continue
                 
-            for _ in range(3):
+            while not action_set:
                 try:
-                    actions_desc = [f'{actions[element_id][i]} ({i})' for i in range(len(actions[element_id]))]
-                    print('You can choose from: ', '\n'.join(actions_desc))
+                    actions_desc = [f'({i}) {actions[element_id][i]}' for i in range(len(actions[element_id]))]
+                    print('You can choose from: ', '; '.join(actions_desc))
                     response = input(f"Please input action id:")
                     action_choice = int(response)
+                    action_set = True
                     break
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt()
                 except:
                     print('warning, wrong format, please input again')
                     continue
                 
             if actions[element_id][action_choice] == 'set_text':
-                for _ in range(3):
+                while not input_set:
                     try:
                         input_text_value = input(f"Please action id:")
+                        input_set = True
                         break
+                    except KeyboardInterrupt:
+                        raise KeyboardInterrupt()
                     except:
+                        print('warning, wrong format, please input again')
                         continue
             return element_id, action_choice, input_text_value
         
@@ -877,21 +895,12 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         elements = state_info['elements']
         
         element_descs, actiontypes, all_elements = [], [], []  # an element may have different action types, so len(all_elements)>len(elements)
-        # executable_actions = [self.memory.get_executable_action(state, target_element, target_action_type)]
-        # action_id = 0
+
         for element_id, element in enumerate(elements):
             element_desc = f"element {element_id}: {element['desc']}"
-            # element_desc = element_desc.ljust(80, ' ')
-            # element_desc += '//'
             all_elements.append(element)
             actiontypes.append(element['allowed_actions'])
-            # for element_action_id, actiontype in enumerate(element['allowed_actions']):
-                # element_descs.append({actiontype}")
-                # action = self.memory.get_executable_action(state, element, actiontype)
-                # element_desc += f" {actiontype} ({element_action_id})"
-                # actiontypes[-1].append(actiontype)
             element_descs.append(element_desc)
-                # action_id += 1
         return element_descs, actiontypes, all_elements
         
         
