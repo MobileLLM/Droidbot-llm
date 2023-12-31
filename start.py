@@ -9,7 +9,7 @@ from droidbot.droidmaster import DroidMaster
 import os
 os.environ['GPT_API_URL'] = "https://api.nextweb.fun/openai/v1/chat/completions"
 os.environ['GPT_API_KEY'] = "ak-nX1zF48PdkdPuJjoNgk8Chbf2AW3mWxZYszDyll3wYu6l2d0"
-
+os.environ['manual'] = 'True'
 def parse_args():
     """
     parse command line input
@@ -91,6 +91,9 @@ def parse_args():
                         help="Ignore Ad views by checking resource_id.")
     parser.add_argument("-replay_output", action="store", dest="replay_output",
                         help="The droidbot output directory being replayed.")
+    
+    # parser.add_argument("-manual", action="store_true",
+    #                     help="manually decide the input event of a state, please input <ID>, '<input text>'")
     options = parser.parse_args()
     # print options
     return options

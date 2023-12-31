@@ -29,12 +29,16 @@ class DeviceState(object):
         self.state_str_ = self.__get_state_str()[:6]
         self.structure_str_ = self.__get_content_free_state_str()[:6]
         self.search_content = self.__get_search_content()
+        
+        self.manual_mode = (os.environ['manual'] == 'True')
         self.text_representation = self.get_text_representation()
         self.possible_events = None
         self.width = device.get_width(refresh=True)
         self.height = device.get_height(refresh=False)
         self.is_popup = self.is_popup_window()
         self.parent_state = None
+        
+        
 
     @property
     def state_str(self):
@@ -602,10 +606,23 @@ class DeviceState(object):
             view_descs.append(view_desc)
             view['desc'] = view_desc.replace(f' id={view_local_id}', '').replace(f' status={status}', '')
             indexed_views.append(view)
-
-        # prefix = 'The current state has the following UI elements: \n' #views and corresponding actions, with action id in parentheses:\n '
+        
+        include_go_back = self.manual_mode
+        if include_go_back:
+            view_descs.append(f"<button>go back</button>")
+            indexed_views.append({
+                'allowed_actions': ['press'],
+                'status':[],
+                'desc': '<button bound_box=0,0,0,0>go back</button>',
+                'event_type': 'press',
+                'bound_box': '0,0,0,0',
+                'class': 'android.widget.ImageView',
+                'content_free_signature': 'android.widget.ImageView',
+                'size': 0
+            })
+            
         state_desc = '\n'.join(view_descs)
-        # print(views_without_id)
+        
         return state_desc, indexed_views
 
     def _get_self_ancestors_property(self, view, key, default=None):

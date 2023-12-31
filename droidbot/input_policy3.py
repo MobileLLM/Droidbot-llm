@@ -35,6 +35,18 @@ DUMP_MEMORY_NUM_STEPS = 3
 
 EXPLORE_WITH_LLM = False
 
+Manual_mode = os.environ['manual'] == 'True'
+GOBACK_element = {
+                'allowed_actions': ['press'],
+                'status':[],
+                'desc': '<button bound_box=0,0,0,0>go back</button>',
+                'event_type': 'press',
+                'bound_box': '0,0,0,0',
+                'class': 'android.widget.ImageView',
+                'content_free_signature': 'android.widget.ImageView',
+                'size': 0,
+                'semantic_element_title': '<button bound_box=0,0,0,0>go back</button>'
+            }
 
 class GPT:
     def __init__(self):
@@ -71,6 +83,8 @@ class Utils:
     @staticmethod
     def get_action_type(action):
         action_type = action.event_type
+        if action_type == KEY_KeyEvent:
+            return KEY_KeyEvent
         allowed_actions = action.view['allowed_actions']
         status = action.view['status']
         if action_type == KEY_TouchEvent and 'select' in allowed_actions:
@@ -90,6 +104,8 @@ class Utils:
         elif 'scroll' in action_type:
             action_dict['event_type'] = KEY_ScrollEvent
             action_dict['direction'] = action_type.split(' ')[-1]
+        elif action_type == 'press':
+            return KeyEvent(name='BACK')
         return InputEvent.from_dict(action_dict)
     
     @staticmethod
@@ -372,17 +388,23 @@ class Memory:
         }
         self.action_history = pd.concat([self.action_history, pd.DataFrame([action_record])], ignore_index=True)
         if not isinstance(action, UIEvent):
-            return
+            if not Manual_mode or isinstance(action, IntentEvent):
+                return
+            
         from_state_info = self._memorize_state(from_state)
         to_state_info = self._memorize_state(to_state)
-        if action.view is None:
+        if not Manual_mode and action.view is None:
             return
         action_str = action.get_event_str(state=from_state)
         if action_str in self.known_transitions and self.known_transitions[action_str]['to_state'] == to_state:
             return
         if from_state_info is None:
             return
-        element = action.view
+        
+        if isinstance(action, UIEvent):
+            element = action.view
+        else:
+            element = GOBACK_element
         action_target = ACTION_INEFFECTIVE \
             if from_state.state_str == to_state.state_str \
             else to_state.state_str
@@ -395,7 +417,7 @@ class Memory:
             'action': action,
             'action_effect': action_effect
         }
-        self.update_action_effects(from_state, to_state, action)
+        self.update_action_effects(from_state, to_state, action)  
 
         from_semantic_state = from_state_info['semantic_state_title']
         to_semantic_state = to_state_info['semantic_state_title']
@@ -408,9 +430,12 @@ class Memory:
             action_targets[action_type].append(action_target)
 
     def update_action_effects(self, from_state, to_state, action):
-        if not isinstance(action, UIEvent):
+        if not isinstance(action, UIEvent) and not Manual_mode:  
             return None
-        element = action.view
+        if not Manual_mode:
+            element = action.view
+        else:
+            element = GOBACK_element
         is_effective = from_state.state_str != to_state.state_str
         from_state_title = self.known_states[from_state.state_str]['semantic_state_title']
         from_state_id = list(self.semantic_states.keys()).index(from_state_title)
@@ -560,7 +585,7 @@ class Memory:
 
 
 class Memory_Guided_Policy(UtgBasedInputPolicy):
-    def __init__(self, device, app, random_input, debug_mode=False):
+    def __init__(self, device, app, random_input):
         super(Memory_Guided_Policy, self).__init__(device, app, random_input)
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -569,8 +594,8 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         self._nav_steps = []
         self._num_steps_outside = 0
         
-        # for manually generating UTG
-        self.debug_mode = debug_mode
+        # # for manually generating UTG
+        # self.manual = Manual_mode
 
     def generate_event_based_on_utg(self):
         """
@@ -592,7 +617,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
             traceback.print_exc()
         # self.logger.info(f'we have {len(self.memory.known_transitions)} transitions now')
         
-        if self.debug_mode and self.last_event is not None:
+        if Manual_mode and self.last_event is not None:
             executable_action = self.get_manual_action(current_state)
             self.logger.debug("current state: %s" % current_state.state_str)
             self._dump_memory()
@@ -807,24 +832,43 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
             
     def get_manual_action(self, state):
         
-        def debug_action_extract(answer):
-            
-            # <element id>, <text>
-            match = re.match(r'(\w+), \'(.*?)\'', answer)
-
-            if match:
-                id_value = int(match.group(1))
-                input_text_value = match.group(2)
-                return id_value, 'input', input_text_value
-            else:
-                return int(answer), 'tap', None
+        def debug_action_extract(actions):
+            element_id, action_choice, input_text_value = None, None, None
+            for _ in range(3):
+                try:
+                    response = input(f"Please input element id:")
+                    element_id = int(response)
+                    break
+                except:
+                    continue
+                
+            for _ in range(3):
+                try:
+                    actions_desc = [f'{actions[element_id][i]} ({i})' for i in range(len(actions[element_id]))]
+                    print('You can choose from: ', '\n'.join(actions_desc))
+                    response = input(f"Please input action id:")
+                    action_choice = int(response)
+                    break
+                except:
+                    print('warning, wrong format, please input again')
+                    continue
+                
+            if actions[element_id][action_choice] == 'set_text':
+                for _ in range(3):
+                    try:
+                        input_text_value = input(f"Please action id:")
+                        break
+                    except:
+                        continue
+            return element_id, action_choice, input_text_value
         
         element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
         element_descs_without_bbox = [re.sub(r'\s*bound_box=\d+,\d+,\d+,\d+', '', desc) for desc in element_descs]
-        print('='*50, '\n', '\n'.join(element_descs_without_bbox), '\n', '='*50)
-        response = input(f"<ID>, '<input text>', e.g. 1, 'Alice': ") #if self.debug_mode else tools.query_gpt(prompt)
-        id, action_type, input_text = debug_action_extract(response)
-        selected_action_type, selected_element = actiontypes[id], all_elements[id]
+        state_desc = "\n".join(element_descs_without_bbox)
+        print('='*80, f'\n{state_desc}\n', '='*80)
+        
+        id, action_id, input_text = debug_action_extract(actiontypes)
+        selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
         return Utils.pack_action(selected_action_type, selected_element, input_text)
         
             
@@ -834,14 +878,20 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         
         element_descs, actiontypes, all_elements = [], [], []  # an element may have different action types, so len(all_elements)>len(elements)
         # executable_actions = [self.memory.get_executable_action(state, target_element, target_action_type)]
-        action_id = 0
+        # action_id = 0
         for element_id, element in enumerate(elements):
-            for element_action_id, actiontype in enumerate(element['allowed_actions']):
-                element_descs.append(f"element{action_id}: {element['desc']} // {actiontype}")
+            element_desc = f"element {element_id}: {element['desc']}"
+            # element_desc = element_desc.ljust(80, ' ')
+            # element_desc += '//'
+            all_elements.append(element)
+            actiontypes.append(element['allowed_actions'])
+            # for element_action_id, actiontype in enumerate(element['allowed_actions']):
+                # element_descs.append({actiontype}")
                 # action = self.memory.get_executable_action(state, element, actiontype)
-                actiontypes.append(actiontype)
-                all_elements.append(element)
-                action_id += 1
+                # element_desc += f" {actiontype} ({element_action_id})"
+                # actiontypes[-1].append(actiontype)
+            element_descs.append(element_desc)
+                # action_id += 1
         return element_descs, actiontypes, all_elements
         
         
