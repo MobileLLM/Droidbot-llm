@@ -44,6 +44,13 @@ Alternatively, you can run without installation using `python start.py` in the r
     + If you want to test a large scale of apps, you may want to add `-keep_env` option to avoid re-installing the test environment every time.
     + You may find other useful features in `droidbot -h`.
 
+3. Start DroidBot with manual policy:
+    go to `start.py` and set `os.environ['manual'] = 'True'`
+    ```
+    droidbot -a <path_to_apk> -o output_dir -policy llm_guided
+    ```
+    That's it! You will find much useful information, including the UTG, generated in the output dir.
+
 ## Acknowledgement
 
 1. The DroidBot Project: [DroidBot](https://github.com/honey/droidbot)

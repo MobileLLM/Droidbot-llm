@@ -9,7 +9,7 @@ from droidbot.droidmaster import DroidMaster
 import os
 os.environ['GPT_API_URL'] = "https://api.nextweb.fun/openai/v1/chat/completions"
 os.environ['GPT_API_KEY'] = "ak-nX1zF48PdkdPuJjoNgk8Chbf2AW3mWxZYszDyll3wYu6l2d0"
-os.environ['manual'] = 'True'
+os.environ['manual'] = 'False'
 def parse_args():
     """
     parse command line input
