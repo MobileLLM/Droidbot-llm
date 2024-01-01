@@ -34,6 +34,7 @@ SKIP_SIMILAR_ACTION_THRESHOLD = 4
 DUMP_MEMORY_NUM_STEPS = 3
 
 EXPLORE_WITH_LLM = False
+ADDTEXT = True
 
 Manual_mode = os.environ['manual'] == 'True'
 GOBACK_element = {
@@ -166,16 +167,31 @@ class Memory:
         state_desc = f' page {list(semantic_states.keys()).index(semantic_state_title)}: {semantic_state_title}\n'
         semantic_elements = semantic_states[semantic_state_title]['semantic_elements']
         same_function_element_groups = []
-        print(semantic_elements)
+        # print(semantic_elements)
         for ei, semantic_element_title in enumerate(semantic_elements.keys()):
             action_targets = semantic_elements[semantic_element_title]['action_targets']
             action_effect_info = []
             # print('action_targets', action_targets)
             if with_target_info:
                 for action_type in action_targets:
-                    target_state_strs = action_targets[action_type]
+                    target_state_infos = action_targets[action_type]
+                    
+                    '''below to add the inputted text into the memory string. You can disable this by setting ADDTEXT = False'''
+                    target_state_strs, input_texts = [], []
+                    for state_id, target_state_info in enumerate(target_state_infos):
+                        input_text = ''
+                        if isinstance(target_state_info, list):
+                            target_state_strs.append(target_state_info[0])
+                            input_text = target_state_info[1]
+                        else:
+                            target_state_strs.append(target_state_info)
+                        input_texts.append(input_text)
+                    '''end'''
+                    
                     target_semantic_state_titles = self._get_target_semantic_states(target_state_strs)
                     action_effects = []
+                    
+                    input_text_id = 0
                     for target_semantic_state_title, _ in target_semantic_state_titles:
                         if target_semantic_state_title == ACTION_INEFFECTIVE:
                             action_effects.append(ACTION_INEFFECTIVE)
@@ -183,12 +199,17 @@ class Memory:
                         # if target_semantic_state_title == semantic_element_title:
                         #     continue
                         target_semantic_state_id = list(semantic_states.keys()).index(target_semantic_state_title)
-                        action_effects.append(f'go to page {str(target_semantic_state_id)}')
+                        if ADDTEXT and action_type == 'set_text':
+                            action_effects.append(f'on set_text(\'{input_texts[input_text_id]}\'), go to page {str(target_semantic_state_id)}')
+                        else:
+                            action_effects.append(f'go to page {str(target_semantic_state_id)}')
+                        input_text_id += 1
+                        
                     if not action_effects:
                         continue
                     
-                    if Manual_mode:
-                        action_effect_info.append(f'on {action_type}, {", ".join(action_effects)}')
+                    if ADDTEXT and action_type == 'set_text':
+                        action_effect_info.append(", ".join(action_effects))
                     else:
                         action_effect_info.append(f'on {action_type}, {", ".join(action_effects)}')
                     
@@ -433,12 +454,15 @@ class Memory:
         if action_type not in action_targets:
             self.logger.warn(f'save_transition: action_type {action_type} not available')
         else:
-            action_targets[action_type].append(action_target)
+            if ADDTEXT and action_type == 'set_text':
+                action_targets[action_type].append([action_target, action.text])
+            else:
+                action_targets[action_type].append(action_target)
 
     def update_action_effects(self, from_state, to_state, action):
         if not isinstance(action, UIEvent) and not Manual_mode:  
             return None
-        if not Manual_mode:
+        if isinstance(action, UIEvent):
             element = action.view
         else:
             element = GOBACK_element
@@ -828,7 +852,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         """
         if not self.device.output_dir:
             return
-        if self.action_count % DUMP_MEMORY_NUM_STEPS != 1:
+        if self.action_count % DUMP_MEMORY_NUM_STEPS != 1 and not Manual_mode:
             return
         self.memory.action_history.to_csv(os.path.join(self.device.output_dir, "actions.csv"))
         memory_path = os.path.join(self.device.output_dir, "memory.txt")
