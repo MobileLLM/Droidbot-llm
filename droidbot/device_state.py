@@ -606,6 +606,7 @@ class DeviceState(object):
                 view_desc = view_desc.replace(" status=null", "")
             view_desc = view_desc.replace("bounds=null", f"bound_box={view_bounds}")
             view_descs.append(view_desc)
+            view['full_desc'] = view_desc.replace(f' id={view_local_id}', '')
             view['desc'] = view_desc.replace(f' id={view_local_id}', '').replace(f' status={status}', '')
             indexed_views.append(view)
         
@@ -620,7 +621,8 @@ class DeviceState(object):
                 'bound_box': '0,0,0,0',
                 'class': 'android.widget.ImageView',
                 'content_free_signature': 'android.widget.ImageView',
-                'size': 0
+                'size': 0,
+                'full_desc': '<button bound_box=0,0,0,0>go back</button>'
             })
             
         state_desc = '\n'.join(view_descs)

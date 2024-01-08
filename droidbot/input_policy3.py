@@ -9,6 +9,7 @@ import os
 import requests
 import json
 import re
+import yaml
 
 import numpy as np
 import pandas as pd
@@ -34,6 +35,8 @@ SKIP_SIMILAR_ACTION_THRESHOLD = 4
 DUMP_MEMORY_NUM_STEPS = 3
 
 EXPLORE_WITH_LLM = False
+
+'''below is for manual mode'''
 ADDTEXT = True
 
 Manual_mode = os.environ['manual'] == 'True'
@@ -48,7 +51,37 @@ GOBACK_element = {
                 'size': 0,
                 'semantic_element_title': '<button bound_box=0,0,0,0>go back</button>'
             }
+def _save2yaml(file_name, state_prompt, idx, inputs=None, action_type='touch', state_str=None, structure_str=None, tag=None, width=None, height=None):
+    if not os.path.exists(file_name):
+        tmp_data = {
+        'step_num': 0,
+        'records': []
+        }
+        with open(file_name, 'w', encoding='utf-8') as f:
+            yaml.dump(tmp_data, f)
 
+    with open(file_name, 'r', encoding='utf-8') as f:
+        old_yaml_data = yaml.safe_load(f)
+    
+    new_records = old_yaml_data['records']
+    new_records.append(
+            {'State': state_prompt,
+            'Choice': idx,
+            'Action': action_type,
+            'Input': inputs,
+            'state_str': state_str,
+            'structure_str': structure_str,
+            'tag':tag,
+            'width':width,
+            'height':height}
+        )
+    data = {
+        'step_num': len(list(old_yaml_data['records'])),
+        'records': new_records
+    }
+    with open(file_name, 'w', encoding='utf-8') as f:
+        yaml.dump(data, f)
+'''end for manual mode'''
 class GPT:
     def __init__(self):
         super().__init__()
@@ -343,13 +376,16 @@ class Memory:
         element_title = element['desc']
         if element_title in semantic_elements:
             return element_title, element_title
+        # if element_title == ''
         element_tag = re.search(r'<(\S+) ', element_title).group(1)
-        element_bound = re.search(r'bound_box=(\S+)>', element_title).group(1)
+        element_bound = re.search(r"bound_box=(\d+,\d+,\d+,\d+)", element_title).group(1)
         for element_i_title in semantic_elements:
             element_i_tag = re.search(r'<(\S+) ', element_i_title).group(1)
-            element_i_bound = re.search(r'bound_box=(\S+)>', element_i_title).group(1)
+            element_i_bound = re.search(r"bound_box=(\d+,\d+,\d+,\d+)", element_i_title).group(1)
             if element_i_tag == element_tag and element_i_bound == element_bound:
                 return element_i_title, element_title
+        # if element_title == '<input bound_box=143,858,1036,974>bob</input>':
+        #     import pdb;pdb.set_trace()
         return None, element_title
 
     def _memorize_state(self, state):
@@ -380,6 +416,7 @@ class Memory:
         for i, element in enumerate(state_info['elements']):
             self.semantic_states[semantic_state_title]['element_sigs'].add(element['content_free_signature'])
             semantic_element_title, element_title = self._classify_element(element, semantic_elements)
+            # print(element, semantic_element_title)
             if not semantic_element_title:
                 semantic_element_title = element_title
                 semantic_elements[semantic_element_title] = {'elements': [], 'action_targets': {}, 'similar_semantic_elements': {}}
@@ -863,6 +900,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
     def get_manual_action(self, state):
         
         def debug_action_extract(actions):
+            # TODO: add an exit and restart action
             ele_set, action_set, input_set = False, False, False
             element_id, action_choice, input_text_value = None, None, None
             while not ele_set:
@@ -894,7 +932,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
             if actions[element_id][action_choice] == 'set_text':
                 while not input_set:
                     try:
-                        input_text_value = input(f"Please action id:")
+                        input_text_value = input(f"Please input the text:")
                         input_set = True
                         break
                     except KeyboardInterrupt:
@@ -911,6 +949,9 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         
         id, action_id, input_text = debug_action_extract(actiontypes)
         selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
+        
+        file_path = os.path.join(self.device.output_dir, 'log.yaml')
+        _save2yaml(file_path, state_desc, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
         return Utils.pack_action(selected_action_type, selected_element, input_text)
         
             
@@ -921,10 +962,16 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         element_descs, actiontypes, all_elements = [], [], []  # an element may have different action types, so len(all_elements)>len(elements)
 
         for element_id, element in enumerate(elements):
-            element_desc = f"element {element_id}: {element['desc']}"
+            element_desc = f"element {element_id}: {element['full_desc']}"
             all_elements.append(element)
             actiontypes.append(element['allowed_actions'])
             element_descs.append(element_desc)
+        state_dict_path = os.path.join(self.device.output_dir, 'StateDicts')
+        if not os.path.exists(state_dict_path):
+            os.mkdir(state_dict_path)
+        state_dict_file = os.path.join(self.device.output_dir, f'StateDicts/{state.tag}.json')
+        with open(state_dict_file, 'w') as f:
+            json.dump(all_elements, f)
         return element_descs, actiontypes, all_elements
         
         
