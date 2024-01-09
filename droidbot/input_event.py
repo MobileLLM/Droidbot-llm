@@ -403,6 +403,8 @@ class RestartAppEvent(InputEvent):
     def send(self, device):
         if self.stop_intent and self.restart_intent:
             device.send_intent(self.stop_intent)
+            device.key_press('BACK')
+            device.key_press('BACK')
             device.send_intent(self.restart_intent)
         # device.key_press('HOME')
 
