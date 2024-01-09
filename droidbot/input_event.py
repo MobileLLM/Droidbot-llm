@@ -82,6 +82,7 @@ KEY_SetTextEvent = "set_text"
 KEY_IntentEvent = "intent"
 KEY_SpawnEvent = "spawn"
 KEY_KillAppEvent = "kill_app"
+KEY_RestartAppEvent = "restart"
 
 
 class InvalidEventException(Exception):
@@ -373,6 +374,37 @@ class KillAppEvent(InputEvent):
         if self.stop_intent:
             device.send_intent(self.stop_intent)
         device.key_press('HOME')
+
+    def get_event_str(self, state):
+        return "%s()" % self.__class__.__name__
+
+
+# ADD RestartAppEvent
+class RestartAppEvent(InputEvent):
+    """
+    an event to stop APP and Restart
+    """
+
+    def __init__(self, app=None, event_dict=None):
+        super().__init__()
+        self.event_type = KEY_RestartAppEvent
+        self.stop_intent = None
+        self.restart_intent = None
+        if app:
+            self.stop_intent = app.get_stop_intent().get_cmd()
+            self.restart_intent = app.get_start_intent().get_cmd()
+        elif event_dict is not None:
+            self.__dict__.update(event_dict)
+
+    @staticmethod
+    def get_random_instance(device, app):
+        return None
+
+    def send(self, device):
+        if self.stop_intent and self.restart_intent:
+            device.send_intent(self.stop_intent)
+            device.send_intent(self.restart_intent)
+        # device.key_press('HOME')
 
     def get_event_str(self, state):
         return "%s()" % self.__class__.__name__

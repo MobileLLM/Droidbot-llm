@@ -624,6 +624,20 @@ class DeviceState(object):
                 'size': 0,
                 'full_desc': '<button bound_box=0,0,0,0>go back</button>'
             })
+        include_restart = self.manual_mode
+        if include_restart:
+            view_descs.append(f"<button>restart</button>")
+            indexed_views.append({
+                'allowed_actions': ['restart'],
+                'status':[],
+                'desc': '<button bound_box=1,1,1,1>restart</button>',
+                'event_type': 'restart',
+                'bound_box': '1,1,1,1',
+                'class': 'android.widget.ImageView',
+                'content_free_signature': 'android.widget.ImageView',
+                'size': 0,
+                'full_desc': '<button bound_box=1,1,1,1>restart</button>'
+            })
             
         state_desc = '\n'.join(view_descs)
         

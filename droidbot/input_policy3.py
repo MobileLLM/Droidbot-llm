@@ -51,6 +51,17 @@ GOBACK_element = {
                 'size': 0,
                 'semantic_element_title': '<button bound_box=0,0,0,0>go back</button>'
             }
+RESTART_element = {
+                'allowed_actions': ['restart'],
+                'status':[],
+                'desc': '<button bound_box=1,1,1,1>restart</button>',
+                'event_type': 'restart',
+                'bound_box': '1,1,1,1',
+                'class': 'android.widget.ImageView',
+                'content_free_signature': 'android.widget.ImageView',
+                'size': 0,
+                'semantic_element_title': '<button bound_box=1,1,1,1>restart</button>'
+            }
 def _save2yaml(file_name, state_prompt, idx, inputs=None, action_type='touch', state_str=None, structure_str=None, tag=None, width=None, height=None):
     if not os.path.exists(file_name):
         tmp_data = {
@@ -119,6 +130,8 @@ class Utils:
         action_type = action.event_type
         if action_type == KEY_KeyEvent:
             return KEY_KeyEvent
+        if action_type == KEY_RestartAppEvent:
+            return KEY_RestartAppEvent
         allowed_actions = action.view['allowed_actions']
         status = action.view['status']
         if action_type == KEY_TouchEvent and 'select' in allowed_actions:
@@ -131,7 +144,7 @@ class Utils:
         return action_type
     
     @staticmethod
-    def pack_action(action_type, target_element, input_text):
+    def pack_action(app, action_type, target_element, input_text):
         action_dict = {'event_type': action_type, 'view': target_element}
         if action_type == KEY_SetTextEvent:
             action_dict['text'] = input_text
@@ -140,6 +153,8 @@ class Utils:
             action_dict['direction'] = action_type.split(' ')[-1]
         elif action_type == 'press':
             return KeyEvent(name='BACK')
+        elif action_type == "restart":
+            return RestartAppEvent(app=app)
         return InputEvent.from_dict(action_dict)
     
     @staticmethod
@@ -465,7 +480,9 @@ class Memory:
         if from_state_info is None:
             return
         
-        if isinstance(action, UIEvent):
+        if isinstance(action, RestartAppEvent):
+            element = RESTART_element
+        elif isinstance(action, UIEvent):
             element = action.view
         else:
             element = GOBACK_element
@@ -499,7 +516,9 @@ class Memory:
     def update_action_effects(self, from_state, to_state, action):
         if not isinstance(action, UIEvent) and not Manual_mode:  
             return None
-        if isinstance(action, UIEvent):
+        if isinstance(action, RestartAppEvent):
+            element = RESTART_element
+        elif isinstance(action, UIEvent):
             element = action.view
         else:
             element = GOBACK_element
@@ -648,7 +667,7 @@ class Memory:
             action_type = random.choice(element['allowed_actions'])
         if action_type == KEY_SetTextEvent and input_text is None:
             input_text = self.gen_input_text(state_desc, element) if action_type == KEY_SetTextEvent else None
-        return state, Utils.pack_action(action_type, element, input_text)
+        return state, Utils.pack_action(self.app, action_type, element, input_text)
 
 
 class Memory_Guided_Policy(UtgBasedInputPolicy):
@@ -835,7 +854,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
             new_view_idx = [view['desc'] for view in new_state_views].index(nav_view_desc)
             new_view = new_state_views[new_view_idx]
             input_text = nav_action.text if hasattr(nav_action, 'text') else None
-            new_action = Utils.pack_action(action_type=Utils.get_action_type(nav_action), target_element=new_view, input_text=input_text)
+            new_action = Utils.pack_action(self.app, action_type=Utils.get_action_type(nav_action), target_element=new_view, input_text=input_text)
             # new_action = copy.deepcopy(nav_action)
             # new_action.view = new_view
             return new_action
@@ -952,7 +971,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         
         file_path = os.path.join(self.device.output_dir, 'log.yaml')
         _save2yaml(file_path, state_desc, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
-        return Utils.pack_action(selected_action_type, selected_element, input_text)
+        return Utils.pack_action(self.app, selected_action_type, selected_element, input_text)
         
             
     def parse_all_executable_actions(self, state):
