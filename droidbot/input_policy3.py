@@ -964,13 +964,14 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
         element_descs_without_bbox = [re.sub(r'\s*bound_box=\d+,\d+,\d+,\d+', '', desc) for desc in element_descs]
         state_desc = "\n".join(element_descs_without_bbox)
+        state_desc_with_bbox = "\n".join(element_descs)
         print('='*80, f'\n{state_desc}\n', '='*80)
         
         id, action_id, input_text = debug_action_extract(actiontypes)
         selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
         
         file_path = os.path.join(self.device.output_dir, 'log.yaml')
-        _save2yaml(file_path, state_desc, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
+        _save2yaml(file_path, state_desc_with_bbox, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
         return Utils.pack_action(self.app, selected_action_type, selected_element, input_text)
         
             
