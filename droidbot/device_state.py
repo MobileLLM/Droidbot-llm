@@ -543,7 +543,7 @@ class DeviceState(object):
             view_text = self.__safe_dict_get(view, 'text', default='')
             view_class = self.__safe_dict_get(view, 'class').split('.')[-1]
             view_bounds = self.__safe_dict_get(view, 'bound_box')
-            if not content_description and not view_text and not scrollable:  # actionable?
+            if not content_description and not view_text and not scrollable:  # actionable? clickable?
                 continue
 
             # text = self._merge_text(view_text, content_description)
@@ -612,17 +612,21 @@ class DeviceState(object):
         
         include_go_back = self.manual_mode
         if include_go_back:
+            screen_width, screen_height = self.device.display_info['width'], self.device.display_info['height']
+            screen_bound_box = [0, screen_height - 48, screen_width//3, screen_height] # default the GOBACK press is on the left
+            screen_bound_box = [str(x) for x in screen_bound_box]
+            screen_bound_box = ','.join(screen_bound_box)
             view_descs.append(f"<button>go back</button>")
             indexed_views.append({
                 'allowed_actions': ['press'],
                 'status':[],
-                'desc': '<button bound_box=0,0,0,0>go back</button>',
+                'desc': f"<button bound_box={screen_bound_box}>go back</button>", 
                 'event_type': 'press',
-                'bound_box': '0,0,0,0',
+                'bound_box': screen_bound_box,
                 'class': 'android.widget.ImageView',
                 'content_free_signature': 'android.widget.ImageView',
                 'size': 0,
-                'full_desc': '<button bound_box=0,0,0,0>go back</button>'
+                'full_desc': f"<button bound_box={screen_bound_box}>go back</button>"
             })
         include_restart = self.manual_mode
         if include_restart:
@@ -630,13 +634,13 @@ class DeviceState(object):
             indexed_views.append({
                 'allowed_actions': ['restart'],
                 'status':[],
-                'desc': '<button bound_box=1,1,1,1>restart</button>',
+                'desc': '<button bound_box=0,0,0,0>restart</button>',
                 'event_type': 'restart',
-                'bound_box': '1,1,1,1',
+                'bound_box': '0,0,0,0',
                 'class': 'android.widget.ImageView',
                 'content_free_signature': 'android.widget.ImageView',
                 'size': 0,
-                'full_desc': '<button bound_box=1,1,1,1>restart</button>'
+                'full_desc': '<button bound_box=0,0,0,0>restart</button>'
             })
             
         state_desc = '\n'.join(view_descs)

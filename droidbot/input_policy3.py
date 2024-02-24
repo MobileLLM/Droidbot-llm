@@ -54,14 +54,30 @@ GOBACK_element = {
 RESTART_element = {
                 'allowed_actions': ['restart'],
                 'status':[],
-                'desc': '<button bound_box=1,1,1,1>restart</button>',
+                'desc': '<button bound_box=0,0,0,0>restart</button>',
                 'event_type': 'restart',
-                'bound_box': '1,1,1,1',
+                'bound_box': '0,0,0,0',
                 'class': 'android.widget.ImageView',
                 'content_free_signature': 'android.widget.ImageView',
                 'size': 0,
-                'semantic_element_title': '<button bound_box=1,1,1,1>restart</button>'
+                'semantic_element_title': '<button bound_box=0,0,0,0>restart</button>'
             }
+
+def _get_GOBACK_element(width, height):
+    _GOBACK_element = GOBACK_element.copy()
+    
+    index = [0, height - 48, width//3, height] # default the GOBACK press is on the left
+    index = [str(x) for x in index]
+
+    bound_box = ','.join(index)
+    _GOBACK_element['bound_box'] = bound_box
+    _GOBACK_element['desc'] = re.sub(r'\s*bound_box=(\d+),(\d+),(\d+),(\d+)', ' bound_box='+bound_box, _GOBACK_element['desc'])
+    _GOBACK_element['semantic_element_title'] = re.sub(r'\s*bound_box=(\d+),(\d+),(\d+),(\d+)', ' bound_box='+bound_box, _GOBACK_element['semantic_element_title'])
+    return _GOBACK_element
+
+def Get_RESTART_element():
+    return RESTART_element
+
 def _save2yaml(file_name, state_prompt, idx, inputs=None, action_type='touch', state_str=None, structure_str=None, tag=None, width=None, height=None):
     if not os.path.exists(file_name):
         tmp_data = {
@@ -92,6 +108,40 @@ def _save2yaml(file_name, state_prompt, idx, inputs=None, action_type='touch', s
     }
     with open(file_name, 'w', encoding='utf-8') as f:
         yaml.dump(data, f)
+
+# todo:: add the description for element
+def _batch_save2yaml(file_name, batch_inputs, state_str=None, structure_str=None, tag=None):
+    if not os.path.exists(file_name):
+        tmp_data = {
+        'step_num': 0,
+        'records': []
+        }
+        with open(file_name, 'w', encoding='utf-8') as f:
+            yaml.dump(tmp_data, f)
+
+    with open(file_name, 'r', encoding='utf-8') as f:
+        old_yaml_data = yaml.safe_load(f)
+    
+    new_records = old_yaml_data['records']
+    for _, x in enumerate(batch_inputs):
+        new_records.append(
+                {'State': x['State'],
+                'Choice': x['Choice'],
+                'Action': x['Action'],
+                'Input': x['Input'],
+                'state_str': state_str,
+                'structure_str': structure_str,
+                'tag':tag,
+                'width':x['width'],
+                'height':x['height']}
+            )
+    data = {
+        'step_num': len(list(old_yaml_data['records'])),
+        'records': new_records
+    }
+    with open(file_name, 'w', encoding='utf-8') as f:
+        yaml.dump(data, f)
+
 '''end for manual mode'''
 class GPT:
     def __init__(self):
@@ -485,7 +535,7 @@ class Memory:
         elif isinstance(action, UIEvent):
             element = action.view
         else:
-            element = GOBACK_element
+            element = _get_GOBACK_element(to_state.width, to_state.height)
         action_target = ACTION_INEFFECTIVE \
             if from_state.state_str == to_state.state_str \
             else to_state.state_str
@@ -521,7 +571,7 @@ class Memory:
         elif isinstance(action, UIEvent):
             element = action.view
         else:
-            element = GOBACK_element
+            element = _get_GOBACK_element(to_state.width, to_state.height)
         is_effective = from_state.state_str != to_state.state_str
         from_state_title = self.known_states[from_state.state_str]['semantic_state_title']
         from_state_id = list(self.semantic_states.keys()).index(from_state_title)
@@ -920,8 +970,30 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         
         def debug_action_extract(actions):
             # TODO: add an exit and restart action
-            ele_set, action_set, input_set = False, False, False
-            element_id, action_choice, input_text_value = None, None, None
+            ele_set, action_set, input_set, record_set = False, False, False, False
+            element_id, action_choice, input_text_value, id_records = None, None, None, None
+
+            while not record_set:
+                try:
+                    response = input(f'Please input element ids needed to extract, using " " to separate:')
+                    if response == '':
+                        record_set = True
+                        break
+                    res = response.split(" ")
+                    id_records = None
+                    if len(res) != 0:
+                        id_records = []
+                        for x in res:
+                            id_records.append(int(x))
+                    record_set = True
+                    break
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt()
+                except:
+                    print('warning, wrong format, do not record')
+                    continue
+            print('='*80)
+
             while not ele_set:
                 try:
                     response = input(f"Please input element id:")
@@ -959,19 +1031,49 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
                     except:
                         print('warning, wrong format, please input again')
                         continue
-            return element_id, action_choice, input_text_value
+            return element_id, action_choice, input_text_value, id_records
         
         element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
         element_descs_without_bbox = [re.sub(r'\s*bound_box=\d+,\d+,\d+,\d+', '', desc) for desc in element_descs]
         state_desc = "\n".join(element_descs_without_bbox)
         state_desc_with_bbox = "\n".join(element_descs)
         print('='*80, f'\n{state_desc}\n', '='*80)
-        
-        id, action_id, input_text = debug_action_extract(actiontypes)
+
+        id, action_id, input_text, id_records = debug_action_extract(actiontypes)
         selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
         
         file_path = os.path.join(self.device.output_dir, 'log.yaml')
         _save2yaml(file_path, state_desc_with_bbox, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
+        if id_records != None:
+            # todo:: file_path is temporary
+            file_path = os.path.join(self.device.output_dir, 'element_records.yaml')
+            batch_meta = []
+            for x in id_records:
+                _element_desc = element_descs[x]
+                _input_text = None
+                _selected_action_type = None
+                if x == id:
+                    _input_text = input_text
+                    _selected_action_type = selected_action_type
+                width, height = 0, 0
+                match = re.search(r'\s*bound_box=(\d+),(\d+),(\d+),(\d+)', _element_desc)
+                if match:
+                    index = match.groups()
+                    try:
+                        width = int(index[2]) - int(index[0])
+                        height = int(index[3]) - int(index[1])
+                    except:
+                        width, height = None, None
+                # _save2yaml(file_path, _element_desc, x, _input_text, _selected_action_type, state.state_str, state.structure_str, state.tag, width, height)
+                batch_meta.append(
+                    {'State': _element_desc,
+                    'Choice': x,
+                    'Action': _selected_action_type,
+                    'Input': _input_text,
+                    'width':width,
+                    'height':height}
+                )
+            _batch_save2yaml(file_path, batch_meta, state.state_str, state.structure_str, state.tag)
         return Utils.pack_action(self.app, selected_action_type, selected_element, input_text)
         
             
