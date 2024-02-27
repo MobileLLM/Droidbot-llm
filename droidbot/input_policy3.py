@@ -110,37 +110,50 @@ def _save2yaml(file_name, state_prompt, idx, inputs=None, action_type='touch', s
         yaml.dump(data, f)
 
 # todo:: add the description for element
-def _batch_save2yaml(file_name, batch_inputs, state_str=None, structure_str=None, tag=None):
+def _records2yaml(file_name, state_prompt, idx, app_name, selected_states, inputs=None, action_type='touch', state_str=None, structure_str=None, tag=None, width=None, height=None):
     if not os.path.exists(file_name):
         tmp_data = {
-        'step_num': 0,
-        'records': []
+            'results' : [
+                {
+                    'app_name': app_name,
+                    'records': [],
+                    'selected_elements': [],
+                    'selected_records': {},
+                    'step_num': 0
+                }
+            ],
+            'comment': None,
+            'task_name': None,
         }
         with open(file_name, 'w', encoding='utf-8') as f:
             yaml.dump(tmp_data, f)
 
     with open(file_name, 'r', encoding='utf-8') as f:
-        old_yaml_data = yaml.safe_load(f)
+        yaml_data = yaml.safe_load(f)
+
+    res = yaml_data['results'][0] # single app
+    record = {'State': state_prompt,
+            'Choice': idx,
+            'Action': action_type,
+            'Input': inputs,
+            'state_str': state_str,
+            'structure_str': structure_str,
+            'tag': tag,
+            'width': width,
+            'height': height}
     
-    new_records = old_yaml_data['records']
-    for _, x in enumerate(batch_inputs):
-        new_records.append(
-                {'State': x['State'],
-                'Choice': x['Choice'],
-                'Action': x['Action'],
-                'Input': x['Input'],
-                'state_str': state_str,
-                'structure_str': structure_str,
-                'tag':tag,
-                'width':x['width'],
-                'height':x['height']}
-            )
-    data = {
-        'step_num': len(list(old_yaml_data['records'])),
-        'records': new_records
-    }
+    index = len(res['records'])
+    res['records'].append(record)
+    
+    if selected_states != None:
+        record_copy = record.copy()
+        record_copy['State'] = selected_states
+        res['selected_elements'].append(record_copy)
+        res['selected_records'][index] = record.copy()
+        res['step_num'] += 1
+
     with open(file_name, 'w', encoding='utf-8') as f:
-        yaml.dump(data, f)
+        yaml.dump(yaml_data, f)
 
 '''end for manual mode'''
 class GPT:
@@ -971,20 +984,28 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         def debug_action_extract(actions):
             # TODO: add an exit and restart action
             ele_set, action_set, input_set, record_set = False, False, False, False
-            element_id, action_choice, input_text_value, id_records = None, None, None, None
+            element_id, action_choice, input_text_value = None, None, None
+            id_states = []
 
             while not record_set:
                 try:
-                    response = input(f'Please input element ids needed to extract, using " " to separate:')
+                    response = input(f'\033[0;32mPlease input element ids needed to extract, using " " to separate:\033[0m')
                     if response == '':
                         record_set = True
                         break
-                    res = response.split(" ")
-                    id_records = None
+                    res = response.strip(" ").split(" ")
+                    id_states = []
                     if len(res) != 0:
-                        id_records = []
+                        id_states = []
                         for x in res:
-                            id_records.append(int(x))
+                            match = re.search(r'^(\d+)-(\d+)$', x)
+                            if match:
+                                start = int(match.group(1))
+                                end = int(match.group(2))
+                                for _i in range(start, end+1):
+                                    id_states.append(_i)
+                            else:
+                                id_states.append(int(x))
                     record_set = True
                     break
                 except KeyboardInterrupt:
@@ -992,7 +1013,6 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
                 except:
                     print('warning, wrong format, do not record')
                     continue
-            print('='*80)
 
             while not ele_set:
                 try:
@@ -1031,7 +1051,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
                     except:
                         print('warning, wrong format, please input again')
                         continue
-            return element_id, action_choice, input_text_value, id_records
+            return element_id, action_choice, input_text_value, id_states
         
         element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
         element_descs_without_bbox = [re.sub(r'\s*bound_box=\d+,\d+,\d+,\d+', '', desc) for desc in element_descs]
@@ -1039,41 +1059,19 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         state_desc_with_bbox = "\n".join(element_descs)
         print('='*80, f'\n{state_desc}\n', '='*80)
 
-        id, action_id, input_text, id_records = debug_action_extract(actiontypes)
+        id, action_id, input_text, id_states = debug_action_extract(actiontypes)
         selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
         
         file_path = os.path.join(self.device.output_dir, 'log.yaml')
         _save2yaml(file_path, state_desc_with_bbox, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
-        if id_records != None:
-            # todo:: file_path is temporary
-            file_path = os.path.join(self.device.output_dir, 'element_records.yaml')
-            batch_meta = []
-            for x in id_records:
-                _element_desc = element_descs[x]
-                _input_text = None
-                _selected_action_type = None
-                if x == id:
-                    _input_text = input_text
-                    _selected_action_type = selected_action_type
-                width, height = 0, 0
-                match = re.search(r'\s*bound_box=(\d+),(\d+),(\d+),(\d+)', _element_desc)
-                if match:
-                    index = match.groups()
-                    try:
-                        width = int(index[2]) - int(index[0])
-                        height = int(index[3]) - int(index[1])
-                    except:
-                        width, height = None, None
-                # _save2yaml(file_path, _element_desc, x, _input_text, _selected_action_type, state.state_str, state.structure_str, state.tag, width, height)
-                batch_meta.append(
-                    {'State': _element_desc,
-                    'Choice': x,
-                    'Action': _selected_action_type,
-                    'Input': _input_text,
-                    'width':width,
-                    'height':height}
-                )
-            _batch_save2yaml(file_path, batch_meta, state.state_str, state.structure_str, state.tag)
+        
+        # selected
+        task_path = os.path.join(self.device.output_dir, f'task_{int(time.time())}.yaml')
+        selected_states = None
+        if len(id_states) > 0:
+            selected_states= '\n'.join([element_descs[i].strip() for i in id_states])
+        
+        _records2yaml(task_path, state_desc_with_bbox, id, self.app.app_name, selected_states, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
         return Utils.pack_action(self.app, selected_action_type, selected_element, input_text)
         
             
