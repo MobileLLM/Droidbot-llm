@@ -63,6 +63,18 @@ RESTART_element = {
                 'semantic_element_title': '<button bound_box=0,0,0,0>restart</button>'
             }
 
+WAIT_element = {
+                'allowed_actions': ['wait'],
+                'status':[],
+                'desc': '<button bound_box=0,0,0,0>wait</button>',
+                'event_type': 'wait',
+                'bound_box': '0,0,0,0',
+                'class': 'android.widget.ImageView',
+                'content_free_signature': 'android.widget.ImageView',
+                'size': 0,
+                'semantic_element_title': '<button bound_box=0,0,0,0>wait</button>'
+            }
+
 def _get_GOBACK_element(width, height):
     _GOBACK_element = GOBACK_element.copy()
     
@@ -74,9 +86,6 @@ def _get_GOBACK_element(width, height):
     _GOBACK_element['desc'] = re.sub(r'\s*bound_box=(\d+),(\d+),(\d+),(\d+)', ' bound_box='+bound_box, _GOBACK_element['desc'])
     _GOBACK_element['semantic_element_title'] = re.sub(r'\s*bound_box=(\d+),(\d+),(\d+),(\d+)', ' bound_box='+bound_box, _GOBACK_element['semantic_element_title'])
     return _GOBACK_element
-
-def Get_RESTART_element():
-    return RESTART_element
 
 def _save2yaml(file_name, state_prompt, idx, inputs=None, action_type='touch', state_str=None, structure_str=None, tag=None, width=None, height=None):
     if not os.path.exists(file_name):
@@ -195,6 +204,8 @@ class Utils:
             return KEY_KeyEvent
         if action_type == KEY_RestartAppEvent:
             return KEY_RestartAppEvent
+        if action_type == KEY_WaitEvent:
+            return KEY_WaitEvent
         allowed_actions = action.view['allowed_actions']
         status = action.view['status']
         if action_type == KEY_TouchEvent and 'select' in allowed_actions:
@@ -218,6 +229,8 @@ class Utils:
             return KeyEvent(name='BACK')
         elif action_type == "restart":
             return RestartAppEvent(app=app)
+        elif action_type == "wait":
+            return WaitEvent()
         return InputEvent.from_dict(action_dict)
     
     @staticmethod
@@ -547,6 +560,8 @@ class Memory:
             element = RESTART_element
         elif isinstance(action, UIEvent):
             element = action.view
+        elif isinstance(action, WaitEvent):
+            element = WAIT_element
         else:
             element = _get_GOBACK_element(to_state.width, to_state.height)
         action_target = ACTION_INEFFECTIVE \
@@ -583,6 +598,8 @@ class Memory:
             element = RESTART_element
         elif isinstance(action, UIEvent):
             element = action.view
+        elif isinstance(action, WaitEvent):
+            element = WAIT_element
         else:
             element = _get_GOBACK_element(to_state.width, to_state.height)
         is_effective = from_state.state_str != to_state.state_str
@@ -987,6 +1004,46 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
             element_id, action_choice, input_text_value = None, None, None
             id_states = []
 
+            while not ele_set:
+                try:
+                    response = input(f"Please input element id:")
+                    element_id = int(response)
+                    ele_set = True
+                    break
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt()
+                except:
+                    print('warning, wrong format, please input again')
+                    continue
+            
+            size = len(actions)
+            if element_id < size and element_id >= 0:
+                while not action_set:
+                    try:
+                        actions_desc = [f'({i}) {actions[element_id][i]}' for i in range(len(actions[element_id]))]
+                        print('You can choose from: ', '; '.join(actions_desc))
+                        response = input(f"Please input action id:")
+                        action_choice = int(response)
+                        action_set = True
+                        break
+                    except KeyboardInterrupt:
+                        raise KeyboardInterrupt()
+                    except:
+                        print('warning, wrong format, please input again')
+                        continue
+                    
+                if actions[element_id][action_choice] == 'set_text':
+                    while not input_set:
+                        try:
+                            input_text_value = input(f"Please input the text:")
+                            input_set = True
+                            break
+                        except KeyboardInterrupt:
+                            raise KeyboardInterrupt()
+                        except:
+                            print('warning, wrong format, please input again')
+                            continue
+            
             while not record_set:
                 try:
                     response = input(f'\033[0;32mPlease input element ids needed to extract, using " " to separate:\033[0m')
@@ -1013,44 +1070,7 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
                 except:
                     print('warning, wrong format, do not record')
                     continue
-
-            while not ele_set:
-                try:
-                    response = input(f"Please input element id:")
-                    element_id = int(response)
-                    ele_set = True
-                    break
-                except KeyboardInterrupt:
-                    raise KeyboardInterrupt()
-                except:
-                    print('warning, wrong format, please input again')
-                    continue
-                
-            while not action_set:
-                try:
-                    actions_desc = [f'({i}) {actions[element_id][i]}' for i in range(len(actions[element_id]))]
-                    print('You can choose from: ', '; '.join(actions_desc))
-                    response = input(f"Please input action id:")
-                    action_choice = int(response)
-                    action_set = True
-                    break
-                except KeyboardInterrupt:
-                    raise KeyboardInterrupt()
-                except:
-                    print('warning, wrong format, please input again')
-                    continue
-                
-            if actions[element_id][action_choice] == 'set_text':
-                while not input_set:
-                    try:
-                        input_text_value = input(f"Please input the text:")
-                        input_set = True
-                        break
-                    except KeyboardInterrupt:
-                        raise KeyboardInterrupt()
-                    except:
-                        print('warning, wrong format, please input again')
-                        continue
+            
             return element_id, action_choice, input_text_value, id_states
         
         element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
@@ -1060,18 +1080,25 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         print('='*80, f'\n{state_desc}\n', '='*80)
 
         id, action_id, input_text, id_states = debug_action_extract(actiontypes)
-        selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
+        selected_action_type, selected_element = None, None
+        if id != -1:
+            selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
+
         
         file_path = os.path.join(self.device.output_dir, 'log.yaml')
         _save2yaml(file_path, state_desc_with_bbox, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
         
         # selected
-        task_path = os.path.join(self.device.output_dir, f'task_{int(time.time())}.yaml')
+        task_path = os.path.join(self.device.output_dir, f'task.yaml')
         selected_states = None
         if len(id_states) > 0:
             selected_states= '\n'.join([element_descs[i].strip() for i in id_states])
         
         _records2yaml(task_path, state_desc_with_bbox, id, self.app.app_name, selected_states, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
+        if id == -1:
+            print("exit...")
+            raise KeyboardInterrupt()
+        
         return Utils.pack_action(self.app, selected_action_type, selected_element, input_text)
         
             

@@ -642,6 +642,20 @@ class DeviceState(object):
                 'size': 0,
                 'full_desc': '<button bound_box=0,0,0,0>restart</button>'
             })
+        include_wait = self.manual_mode
+        if include_wait:
+            view_descs.append("<button>wait</button>")
+            indexed_views.append({
+                'allowed_actions': ['wait'],
+                'status':[],
+                'desc': '<button bound_box=0,0,0,0>wait</button>',
+                'event_type': 'wait',
+                'bound_box': '0,0,0,0',
+                'class': 'android.widget.ImageView',
+                'content_free_signature': 'android.widget.ImageView',
+                'size': 0,
+                'full_desc': '<button bound_box=0,0,0,0>wait</button>'
+            })
             
         state_desc = '\n'.join(view_descs)
         

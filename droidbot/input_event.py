@@ -83,6 +83,7 @@ KEY_IntentEvent = "intent"
 KEY_SpawnEvent = "spawn"
 KEY_KillAppEvent = "kill_app"
 KEY_RestartAppEvent = "restart"
+KEY_WaitEvent = 'wait'
 
 
 class InvalidEventException(Exception):
@@ -411,6 +412,27 @@ class RestartAppEvent(InputEvent):
     def get_event_str(self, state):
         return "%s()" % self.__class__.__name__
 
+class WaitEvent(InputEvent):
+    """
+    do nothing and wait response in app, such as browser
+    """
+    def __init__(self, event_dict=None):
+        super().__init__()
+        self.event_type = KEY_WaitEvent
+        self.time = time.time()
+        if event_dict is not None:
+            self.__dict__.update(event_dict)
+
+    @staticmethod
+    def get_random_instance(device, app):
+        return None
+
+    def send(self, device):
+        # do nothing
+        pass
+
+    def get_event_str(self, state):
+        return "%s(time=%s)" % (self.__class__.__name__, self.time)
 
 class KeyEvent(InputEvent):
     """
