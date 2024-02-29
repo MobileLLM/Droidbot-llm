@@ -525,8 +525,20 @@ class DeviceState(object):
         indexed_views = []
         # available_actions = []
         removed_view_ids = []
+        
+        # # visualize
+        # import graphviz
+        # dot = graphviz.Digraph(format='svg')
+        # visit_node = {}
 
         for view_id in enabled_view_ids:
+            # # visualize
+            # view_id_str = str(view_id)
+            # if not visit_node.get(view_id):
+            #     dot.node(view_id_str, label=f"{view_id_str}, {view['resource_id']}", shape='plaintext')
+            #     for e in view['children']:            
+            #         dot.edge(view_id_str, str(e))
+
             if view_id in removed_view_ids:
                 continue
             # print(view_id)
@@ -610,6 +622,9 @@ class DeviceState(object):
             view['desc'] = view_desc.replace(f' id={view_local_id}', '').replace(f' status={status}', '')
             indexed_views.append(view)
         
+        # # visualize
+        # dot.render('view_tree', view=False)
+
         include_go_back = self.manual_mode
         if include_go_back:
             screen_width, screen_height = self.device.display_info['width'], self.device.display_info['height']

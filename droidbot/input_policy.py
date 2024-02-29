@@ -33,6 +33,7 @@ POLICY_MANUAL = "manual"
 POLICY_MONKEY = "monkey"
 POLICY_NONE = "none"
 POLICY_MEMORY_GUIDED = "memory_guided"  # implemented in input_policy3
+POLICY_MIXED_GUIDED = "mixed_guided" # implemented in input_policy4
 POLICY_LLM_GUIDED = "llm_guided"  # implemented in input_policy3
 
 

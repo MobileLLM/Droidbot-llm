@@ -38,7 +38,7 @@ EXPLORE_WITH_LLM = False
 
 '''below is for manual mode'''
 ADDTEXT = True
-
+SELECTMODE = False
 Manual_mode = os.environ['manual'] == 'True'
 GOBACK_element = {
                 'allowed_actions': ['press'],
@@ -1044,6 +1044,9 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
                             print('warning, wrong format, please input again')
                             continue
             
+            if not SELECTMODE:
+                return element_id, action_choice, input_text_value, id_states
+
             while not record_set:
                 try:
                     response = input(f'\033[0;32mPlease input element ids needed to extract, using " " to separate:\033[0m')
@@ -1089,12 +1092,13 @@ class Memory_Guided_Policy(UtgBasedInputPolicy):
         _save2yaml(file_path, state_desc_with_bbox, id, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
         
         # selected
-        task_path = os.path.join(self.device.output_dir, f'task.yaml')
-        selected_states = None
-        if len(id_states) > 0:
-            selected_states= '\n'.join([element_descs[i].strip() for i in id_states])
-        
-        _records2yaml(task_path, state_desc_with_bbox, id, self.app.app_name, selected_states, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
+        if SELECTMODE:
+            task_path = os.path.join(self.device.output_dir, f'task.yaml')
+            selected_states = None
+            if len(id_states) > 0:
+                selected_states= '\n'.join([element_descs[i].strip() for i in id_states])
+            
+            _records2yaml(task_path, state_desc_with_bbox, id, self.app.app_name, selected_states, input_text, selected_action_type, state.state_str, state.structure_str, state.tag, state.width, state.height)
         if id == -1:
             print("exit...")
             raise KeyboardInterrupt()
