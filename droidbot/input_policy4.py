@@ -106,7 +106,7 @@ class Mixed_Guided_Policy(UtgBasedInputPolicy):
         # self.manual = Manual_mode
         self._visited = {} # {state_str}, {0, 1}
         self._path2state = {} # {state_str}_{element_id}_{action_id}, {state_str}
-        self._visited_path ={} # {state_str}_{element_id}_{action_id}, {0, 1}
+        self._masked_ele ={} # {state_str}_{element_id}, {0, 1}
         self.auto_selection = False
         self.last_path = None
         self.start_state = None
@@ -133,8 +133,6 @@ class Mixed_Guided_Policy(UtgBasedInputPolicy):
                 print("\033[0;32mNew state\033[0m")
             if self.last_path:
                 self._path2state[self.last_path] = current_state.state_str
-                if self._visited.get(self.last_state.state_str) != None: # get out of loop
-                    self._visited_path[self.last_path] = 1
             executable_action = self._get_action(current_state)
             self.logger.debug("current state: %s" % current_state.state_str)
             return returned_action(current_state, executable_action)
@@ -152,13 +150,17 @@ class Mixed_Guided_Policy(UtgBasedInputPolicy):
             # TODO: add an exit and restart action
             ele_set, action_set, input_set = False, False, False
             element_id, action_choice, input_text_value = None, None, None
-            auto_set = None
 
             print('='*80, f'\n{state_desc}\n', '='*80)
+            size = len(actions)
+
             while not ele_set:
                 try:
                     response = input(f"Please input element id:")
                     element_id = int(response)
+                    if element_id >= size and element_id < 0:
+                        print('warning, wrong index, please input again')
+                        continue
                     ele_set = True
                     break
                 except KeyboardInterrupt:
@@ -167,54 +169,73 @@ class Mixed_Guided_Policy(UtgBasedInputPolicy):
                     print('warning, wrong format, please input again')
                     continue
             
-            size = len(actions)
-            if element_id < size and element_id >= 0:
-                while not action_set:
+            while not action_set:
+                try:
+                    actions_desc = [f'({i}) {actions[element_id][i]}' for i in range(len(actions[element_id]))]
+                    print('You can choose from: ', '; '.join(actions_desc))
+                    response = input(f"Please input action id:")
+                    action_choice = int(response)
+                    action_set = True
+                    break
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt()
+                except:
+                    print('warning, wrong format, please input again')
+                    continue
+            
+            if self._visited.get(self._path2state.get(f"{state.state_str}_{element_id}_{action_choice}")):
+                print(f"\033[0;32mThe {state.state_str}_{element_id}_{action_choice} approached state is marked visited\033[0m")
+            
+            if actions[element_id][action_choice] == 'set_text':
+                while not input_set:
                     try:
-                        actions_desc = [f'({i}) {actions[element_id][i]}' for i in range(len(actions[element_id]))]
-                        print('You can choose from: ', '; '.join(actions_desc))
-                        response = input(f"Please input action id:")
-                        action_choice = int(response)
-                        action_set = True
+                        input_text_value = input(f"Please input the text:")
+                        input_set = True
                         break
                     except KeyboardInterrupt:
                         raise KeyboardInterrupt()
                     except:
                         print('warning, wrong format, please input again')
                         continue
-                    
-                if actions[element_id][action_choice] == 'set_text':
-                    while not input_set:
-                        try:
-                            input_text_value = input(f"Please input the text:")
-                            input_set = True
-                            break
-                        except KeyboardInterrupt:
-                            raise KeyboardInterrupt()
-                        except:
-                            print('warning, wrong format, please input again')
-                            continue
+
             
-            try:
-                response = input(f"Input 0 to terminate auto strategy, and input 1 to set state visited, and input 2 to terminate and set visited:")
-                if not response:
-                    auto_set = -1
-                else:
-                    auto_set = int(response)
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt()
-            except:
-                print('warning, wrong format, set auto strategy')
-                auto_set = -1
+            flag = False
+            auto_setting = None
+            while not flag:
+                try:
+                    response = input("Input #1 #2 [3] to set: \n #1 setting any/1 to enable/disable auto selection\n #2 setting 1 to mask state\n [3] mask the list of elements:\n")
+                    if response:
+                        res = response.strip().split(" ")
+                        res = [int(x) for x in res]
+                        auto_setting = res
+                        if len(res) < 2:
+                            auto_setting.append(0)
+                            break
+                        err_index = []
+                        for x in res[2:]:
+                            if x >= size and x < 0:
+                                err_index.append(x)
+                        
+                        if len(err_index) == 0:
+                            break
+                        print(f'warning, wrong element id: {err_index}, please input again')
+                    else:
+                        auto_setting = [0, 0]
+                        break
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt()
+                except:
+                    print('warning, wrong format, please input again')
+                    continue
                     
-            return element_id, action_choice, input_text_value, auto_set
+            return element_id, action_choice, input_text_value, auto_setting
         
         element_descs, actiontypes, all_elements = self.parse_all_executable_actions(state)
         element_descs_without_bbox = [re.sub(r'\s*bound_box=\d+,\d+,\d+,\d+', '', desc) for desc in element_descs]
         state_desc = "\n".join(element_descs_without_bbox)
         state_desc_with_bbox = "\n".join(element_descs)
 
-        auto_set = -1
+        auto_set = None
         if self.auto_selection: 
             id, action_id, input_text = self._DFS_action_extract(actiontypes, state, state_desc, element_descs)
         else:
@@ -223,14 +244,13 @@ class Mixed_Guided_Policy(UtgBasedInputPolicy):
         if id == -1:
             id, action_id, input_text, auto_set = manual_action_extract(actiontypes, state_desc)
 
-        if auto_set == 0 or auto_set == 2:
-            self.auto_selection = False
-        elif auto_set == -1:
-            self.auto_selection = True
-        
-        if auto_set == 1 or auto_set == 2:
-            self._visited[state.state_str] = 1
-        
+        if auto_set:
+            self.auto_selection = auto_set[0] != 1
+            if auto_set[1] == 1:
+                self._visited[state.state_str] = 1
+            for x in auto_set[2:]:
+                self._masked_ele[f"{state.state_str}_{x}"] = 1
+
         selected_action_type, selected_element = None, None
         if id >= 0:
             selected_action_type, selected_element = actiontypes[id][action_id], all_elements[id]
@@ -251,14 +271,18 @@ class Mixed_Guided_Policy(UtgBasedInputPolicy):
     def _DFS_action_extract(self, actiontypes, state, state_desc, elements):
         input_text = None
         for i, action in enumerate(actiontypes):
-            if re.search(r'(<p.*?>.*?</p>)', elements[i]):
+            if re.search(r'(<p.*?>.*?</p>)', elements[i] or self._masked_ele.get(f"{state.state_str}_{i}")):
                 continue
-
+            
+            if re.search(r'(<checkbox.*?>.*?</checkbox>)', elements[i]):
+                print("\033[0;32mMeeting Checkbox\033[0m")
+                return -1, None, None
+            
             if i == len(actiontypes) - 3:
                 break
             for j in range(len(action)):
                 _path = f"{state.state_str}_{i}_{j}"
-                if  self._visited.get(self._path2state.get(_path)) == 1 or self._visited_path.get(_path) == 1:
+                if  self._visited.get(self._path2state.get(_path)) == 1:
                     continue
                                 
                 if action[j] == 'set_text':
