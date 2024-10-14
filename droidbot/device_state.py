@@ -11,7 +11,7 @@ class DeviceState(object):
     the state of the current device
     """
 
-    def __init__(self, device, views, foreground_activity, activity_stack, background_services,
+    def __init__(self, device, views, foreground_activity, activity_stack, background_services=None,
                  tag=None, screenshot_path=None):
         self.device = device
         self.foreground_activity = foreground_activity
@@ -30,7 +30,7 @@ class DeviceState(object):
         self.structure_str_ = self.__get_content_free_state_str()[:6]
         self.search_content = self.__get_search_content()
         
-        self.manual_mode = (os.environ['manual'] == 'True')
+        self.manual_mode = ('manual' in os.environ and os.environ['manual'] == 'True')
         self.text_representation = self.get_text_representation()
         self.possible_events = None
         self.width = device.get_width(refresh=True)
@@ -38,8 +38,6 @@ class DeviceState(object):
         self.is_popup = self.is_popup_window()
         self.parent_state = None
         
-        
-
     @property
     def state_str(self):
         if self.is_popup and self.parent_state is not None:
@@ -418,12 +416,13 @@ class DeviceState(object):
         """
         children = self.__safe_dict_get(view_dict, 'children')
         if not children:
-            return set()
-        children = set(children)
+            return []
+        ret_children = []
+        ret_children.extend(children)
         for child in children:
             children_of_child = self.get_all_children(self.views[child])
-            children.union(children_of_child)
-        return children
+            ret_children.extend(children_of_child)
+        return ret_children
 
     def get_app_activity_depth(self, app):
         """

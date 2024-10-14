@@ -813,7 +813,7 @@ class Device(object):
             views = self.get_views()
             foreground_activity = self.get_top_activity_name()
             activity_stack = self.get_current_activity_stack()
-            background_services = self.get_service_names()
+            # background_services = self.get_service_names()
             screenshot_path = self.take_screenshot()
             self.logger.debug("finish getting current device state...")
             from .device_state import DeviceState
@@ -821,7 +821,7 @@ class Device(object):
                                         views=views,
                                         foreground_activity=foreground_activity,
                                         activity_stack=activity_stack,
-                                        background_services=background_services,
+                                        # background_services=background_services,
                                         screenshot_path=screenshot_path)
         except Exception as e:
             self.logger.warning("exception in get_current_state: %s" % e)
