@@ -156,8 +156,8 @@ class ADB(Adapter):
         This is a method to obtain display dimensions and density
         """
         display_info = {}
-        logical_display_re = re.compile(".*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+),"
-                                        " .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*")
+        logical_display_re = re.compile(r'.*DisplayViewport{valid=true, .*orientation=(?P<orientation>\d+),'
+                                        r' .*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*')
         dumpsys_display_result = self.shell("dumpsys display")
         if dumpsys_display_result is not None:
             for line in dumpsys_display_result.splitlines():
@@ -167,7 +167,7 @@ class ADB(Adapter):
                         display_info[prop] = int(m.group(prop))
 
         if 'width' not in display_info or 'height' not in display_info:
-            physical_display_re = re.compile('Physical size: (?P<width>\d+)x(?P<height>\d+)')
+            physical_display_re = re.compile(r'Physical size: (?P<width>\d+)x(?P<height>\d+)')
             m = physical_display_re.search(self.shell('wm size'))
             if m:
                 for prop in ['width', 'height']:
@@ -175,9 +175,9 @@ class ADB(Adapter):
 
         if 'width' not in display_info or 'height' not in display_info:
             # This could also be mSystem or mOverscanScreen
-            display_re = re.compile('\s*mUnrestrictedScreen=\((?P<x>\d+),(?P<y>\d+)\) (?P<width>\d+)x(?P<height>\d+)')
+            display_re = re.compile(r'\s*mUnrestrictedScreen=\((?P<x>\d+),(?P<y>\d+)\) (?P<width>\d+)x(?P<height>\d+)')
             # This is known to work on older versions (i.e. API 10) where mrestrictedScreen is not available
-            display_width_height_re = re.compile('\s*DisplayWidth=(?P<width>\d+) *DisplayHeight=(?P<height>\d+)')
+            display_width_height_re = re.compile(r'\s*DisplayWidth=(?P<width>\d+) *DisplayHeight=(?P<height>\d+)')
             for line in self.shell('dumpsys window').splitlines():
                 m = display_re.search(line, 0)
                 if not m:
@@ -187,7 +187,7 @@ class ADB(Adapter):
                         display_info[prop] = int(m.group(prop))
 
         if 'orientation' not in display_info:
-            surface_orientation_re = re.compile("SurfaceOrientation:\s+(\d+)")
+            surface_orientation_re = re.compile(r"SurfaceOrientation:\s+(\d+)")
             output = self.shell("dumpsys input")
             m = surface_orientation_re.search(output)
             if m:
@@ -203,7 +203,7 @@ class ADB(Adapter):
             if float_re.match(d):
                 density = float(d)
             else:
-                physical_density_re = re.compile('Physical density: (?P<density>[\d.]+)', re.MULTILINE)
+                physical_density_re = re.compile(r'Physical density: (?P<density>[\d.]+)', re.MULTILINE)
                 m = physical_density_re.search(self.shell('wm density'))
                 if m:
                     density = float(m.group('density'))
@@ -271,7 +271,7 @@ class ADB(Adapter):
         :return: a dict, each key is a package name of an app and each value is the file path to the apk
         """
         app_lines = self.shell("pm list packages -f").splitlines()
-        app_line_re = re.compile("package:(?P<apk_path>.+)=(?P<package>[^=]+)")
+        app_line_re = re.compile(r'package:(?P<apk_path>.+)=(?P<package>[^=]+)')
         package_to_path = {}
         for app_line in app_lines:
             m = app_line_re.match(app_line)
