@@ -63,7 +63,10 @@ class Logcat(Adapter):
                 continue
             line = self.process.stdout.readline()
             if not isinstance(line, str):
-                line = line.decode()
+                try:
+                    line = line.decode('utf-8')
+                except UnicodeDecodeError:
+                    line = line.decode('utf-8', errors='replace')
             self.recent_lines.append(line)
             self.parse_line(line)
             if f is not None:
