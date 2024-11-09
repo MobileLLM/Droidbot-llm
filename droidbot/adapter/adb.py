@@ -64,7 +64,7 @@ class ADB(Adapter):
         args += extra_args
 
         self.logger.debug('command:')
-        self.logger.debug(args)
+        self.logger.debug(f"{args}")
         r = subprocess.check_output(args).strip()
         if not isinstance(r, str):
             r = r.decode()
